@@ -132,121 +132,141 @@ var ErrLength = fmt.Errorf("invalid mli length provided")
 // Note: 2EE Message Length Indicators are unique in that they contain a 2-byte header which is not accounted for in
 // the message length. When decoding a 2EE MLI of 1500, the return value will include the header length, 1502.
 func Decode(key string, b *[]byte) (int, error) {
-	switch key {
-	case MLI2I:
-		// Validate length vs. expected length
-		if len(*b) != Size2I {
-			return 0, ErrByteSize
-		}
-
-		// Convert to integer using Network Byte Order
-		n := int(binary.BigEndian.Uint16(*b))
-		// If 0 return right away
-		if n == 0 {
-			return 0, nil
-		}
-
-		// Remove MLI length and validate message length is valid
-		n = n - Size2I
-		if n < 0 {
-			return 0, ErrLength
-		}
-		return n, nil
-
-	case MLI2E:
-		// Validate length vs expected length
-		if len(*b) != Size2E {
-			return 0, ErrByteSize
-		}
-
-		// Convert to integer using Network Byte Order
-		n := int(binary.BigEndian.Uint16(*b))
-		return n, nil
-
-	case MLI4I:
-		// Validate length vs expected length
-		if len(*b) != Size4I {
-			return 0, ErrByteSize
-		}
-
-		// Convert to integer using Network Byte Order
-		n := int(binary.BigEndian.Uint32(*b))
-		// If 0 return right away
-		if n == 0 {
-			return 0, nil
-		}
-
-		// Remove MLI length and validate message length is valid
-		n = n - Size4I
-		if n < 0 {
-			return 0, ErrLength
-		}
-		return n, nil
-
-	case MLI4E:
-		// Validate length vs expected length
-		if len(*b) != Size4E {
-			return 0, ErrByteSize
-		}
-
-		// Convert to integer using Network Byte Order
-		n := int(binary.BigEndian.Uint32(*b))
-		return n, nil
-
-	case MLI2EE:
-		// Validate length vs expected length
-		if len(*b) != Size2EE {
-			return 0, ErrByteSize
-		}
-
-		// Convert to integer using Network Byte Order
-		n := int(binary.BigEndian.Uint16(*b)) + 2 // add 2-byte header length
-		return n, nil
-
-	case MLI2BCD2:
-		// Validate length vs expected length
-		if len(*b) != Size2BCD2 {
-			return 0, ErrByteSize
-		}
-
-		// Convert from hex to integer using Binary-Coded Decimal
-		n, err := strconv.Atoi(hex.EncodeToString((*b)[2:4]))
-		if err != nil {
-			return 0, fmt.Errorf("could not convert hex string to integer - %s", err)
-		}
-		// If 0 return right away
-		if n == 0 {
-			return 0, nil
-		}
-
-		// Remove MLI length and validate message length is valid
-		n = n - Size2BCD2
-		if n < 0 {
-			return 0, ErrLength
-		}
-		return n, nil
-
-	case MLIA4E:
-		// Validate length vs expected length
-		if len(*b) != SizeA4E {
-			return 0, ErrByteSize
-		}
-
-		// Check for edge case of 0 in hex format
-		if bytes.Count(*b, []byte{'0'}) == len(*b) {
-			return 0, nil
-		}
-
-		// Convert to integer from ASCII
-		n, err := strconv.Atoi(string(*b))
-		if err != nil {
-			return 0, fmt.Errorf("unable to convert string values to integer - %s", err)
-		}
-		return n, nil
-
-	default:
+	decoder, ok := decoders[key]
+	if !ok {
 		return 0, fmt.Errorf("Invalid MLI type provided")
 	}
+	return decoder(b)
+}
+
+// We are using a map instead of a switch statement to allow for O(1) lookups instead of O(n)
+// walking of the switch cases.
+var decoders = map[string]func(b *[]byte) (int, error){
+	MLI2I:    decodeMLI2I,
+	MLI2E:    decodeMLI2E,
+	MLI4I:    decodeMLI4I,
+	MLI4E:    decodeMLI4E,
+	MLIA4E:   decodeMLIA4E,
+	MLI2BCD2: decodeMLI2BCD2,
+	MLI2EE:   decodeMLI2EE,
+}
+
+func decodeMLI2I(b *[]byte) (int, error) {
+	// Validate length vs. expected length
+	if len(*b) != Size2I {
+		return 0, ErrByteSize
+	}
+
+	// Convert to integer using Network Byte Order
+	n := int(binary.BigEndian.Uint16(*b))
+	// If 0 return right away
+	if n == 0 {
+		return 0, nil
+	}
+
+	// Remove MLI length and validate message length is valid
+	n = n - Size2I
+	if n < 0 {
+		return 0, ErrLength
+	}
+	return n, nil
+}
+
+func decodeMLI2E(b *[]byte) (int, error) {
+	// Validate length vs expected length
+	if len(*b) != Size2E {
+		return 0, ErrByteSize
+	}
+
+	// Convert to integer using Network Byte Order
+	n := int(binary.BigEndian.Uint16(*b))
+	return n, nil
+}
+
+func decodeMLI4I(b *[]byte) (int, error) {
+	// Validate length vs expected length
+	if len(*b) != Size4I {
+		return 0, ErrByteSize
+	}
+
+	// Convert to integer using Network Byte Order
+	n := int(binary.BigEndian.Uint32(*b))
+	// If 0 return right away
+	if n == 0 {
+		return 0, nil
+	}
+
+	// Remove MLI length and validate message length is valid
+	n = n - Size4I
+	if n < 0 {
+		return 0, ErrLength
+	}
+	return n, nil
+}
+
+func decodeMLI4E(b *[]byte) (int, error) {
+	// Validate length vs expected length
+	if len(*b) != Size4E {
+		return 0, ErrByteSize
+	}
+
+	// Convert to integer using Network Byte Order
+	n := int(binary.BigEndian.Uint32(*b))
+	return n, nil
+}
+
+func decodeMLI2EE(b *[]byte) (int, error) {
+	// Validate length vs expected length
+	if len(*b) != Size2EE {
+		return 0, ErrByteSize
+	}
+
+	// Convert to integer using Network Byte Order
+	n := int(binary.BigEndian.Uint16(*b)) + 2 // add 2-byte header length
+	return n, nil
+}
+
+func decodeMLI2BCD2(b *[]byte) (int, error) {
+	// Validate length vs expected length
+	if len(*b) != Size2BCD2 {
+		return 0, ErrByteSize
+	}
+
+	// Convert from hex to integer using Binary-Coded Decimal
+	n, err := strconv.Atoi(hex.EncodeToString((*b)[2:4]))
+	if err != nil {
+		return 0, fmt.Errorf("could not convert hex string to integer - %s", err)
+	}
+	// If 0 return right away
+	if n == 0 {
+		return 0, nil
+	}
+
+	// Remove MLI length and validate message length is valid
+	n = n - Size2BCD2
+	if n < 0 {
+		return 0, ErrLength
+	}
+	return n, nil
+}
+
+func decodeMLIA4E(b *[]byte) (int, error) {
+	// Validate length vs expected length
+	if len(*b) != SizeA4E {
+		return 0, ErrByteSize
+	}
+
+	// Check for edge case of 0 in hex format
+	if bytes.Count(*b, []byte{'0'}) == len(*b) {
+		return 0, nil
+	}
+
+	// Convert to integer from ASCII
+	n, err := strconv.Atoi(string(*b))
+	if err != nil {
+		return 0, fmt.Errorf("unable to convert string values to integer - %s", err)
+	}
+	return n, nil
 }
 
 // Encode will accept a message length type and message length value desired. Encode will return a byte slice which
@@ -269,56 +289,75 @@ func Encode(key string, length int) ([]byte, error) {
 		return empty, ErrLength
 	}
 
-	switch key {
-	case MLI2I:
-		// Create MLI in Network Byte Order
-		b := make([]byte, Size2I)
-		binary.BigEndian.PutUint16(b, uint16(length+Size2I)) // include mli size
-		return b, nil
-
-	case MLI2E:
-		// Create MLI in Network Byte Order
-		b := make([]byte, Size2E)
-		binary.BigEndian.PutUint16(b, uint16(length))
-		return b, nil
-
-	case MLI4I:
-		// Create MLI in Network Byte Order
-		b := make([]byte, Size4I)
-		binary.BigEndian.PutUint32(b, uint32(length+Size4I)) // include mli size
-		return b, nil
-
-	case MLI4E:
-		// Create MLI in Network Byte Order
-		b := make([]byte, Size4E)
-		binary.BigEndian.PutUint32(b, uint32(length))
-		return b, nil
-
-	case MLI2EE:
-		// Create MLI in Network Byte Order
-		b := make([]byte, Size2EE)
-		binary.BigEndian.PutUint16(b, uint16(length-Size2EE)) // remove embedded 2-byte header length
-		return b, nil
-
-	case MLI2BCD2:
-		// Create MLI in Binary-Coded Decimal
-		h, err := hex.DecodeString(fmt.Sprintf("%04d", length+Size2BCD2)) // %04d is binary-coded decimal format, wrap in hex
-		if err != nil {
-			return empty, fmt.Errorf("unable to convert length to hex binary-coded decimal - %s", err)
-		}
-		// Create empty 2-byte header
-		b := make([]byte, 2)
-		b = append(b, h...)
-		return b, nil
-
-	case MLIA4E:
-		// Create MLI in Hex-ASCII format
-		s := fmt.Sprintf("%04d", length)
-		s = fmt.Sprintf("%X", s)
-		b, _ := hex.DecodeString(s)
-		return b, nil
-
-	default:
+	encoder, ok := encoders[key]
+	if !ok {
 		return empty, fmt.Errorf("Invalid MLI type provided")
 	}
+
+	return encoder(length)
+}
+
+var encoders = map[string]func(length int) ([]byte, error){
+	MLI2I:    encodeMLI2I,
+	MLI2E:    encodeMLI2E,
+	MLI4I:    encodeMLI4I,
+	MLI4E:    encodeMLI4E,
+	MLI2EE:   encodeMLI2EE,
+	MLI2BCD2: encodeMLI2BCD2,
+	MLIA4E:   encodeMLIA4E,
+}
+
+func encodeMLI2I(length int) ([]byte, error) {
+	// Create MLI in Network Byte Order
+	b := make([]byte, Size2I)
+	binary.BigEndian.PutUint16(b, uint16(length+Size2I)) // include mli size
+	return b, nil
+}
+
+func encodeMLI2E(length int) ([]byte, error) {
+	// Create MLI in Network Byte Order
+	b := make([]byte, Size2E)
+	binary.BigEndian.PutUint16(b, uint16(length))
+	return b, nil
+}
+
+func encodeMLI4I(length int) ([]byte, error) {
+	// Create MLI in Network Byte Order
+	b := make([]byte, Size4I)
+	binary.BigEndian.PutUint32(b, uint32(length+Size4I)) // include mli size
+	return b, nil
+}
+
+func encodeMLI4E(length int) ([]byte, error) {
+	// Create MLI in Network Byte Order
+	b := make([]byte, Size4E)
+	binary.BigEndian.PutUint32(b, uint32(length))
+	return b, nil
+}
+
+func encodeMLI2EE(length int) ([]byte, error) {
+	// Create MLI in Network Byte Order
+	b := make([]byte, Size2EE)
+	binary.BigEndian.PutUint16(b, uint16(length-Size2EE)) // remove embedded 2-byte header length
+	return b, nil
+}
+
+func encodeMLI2BCD2(length int) ([]byte, error) {
+	// Create MLI in Binary-Coded Decimal
+	h, err := hex.DecodeString(fmt.Sprintf("%04d", length+Size2BCD2)) // %04d is binary-coded decimal format, wrap in hex
+	if err != nil {
+		return empty, fmt.Errorf("unable to convert length to hex binary-coded decimal - %s", err)
+	}
+	// Create empty 2-byte header
+	b := make([]byte, 2)
+	b = append(b, h...)
+	return b, nil
+}
+
+func encodeMLIA4E(length int) ([]byte, error) {
+	// Create MLI in Hex-ASCII format
+	s := fmt.Sprintf("%04d", length)
+	s = fmt.Sprintf("%X", s)
+	b, _ := hex.DecodeString(s)
+	return b, nil
 }
