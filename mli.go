@@ -277,33 +277,33 @@ func Encode(key string, length int) ([]byte, error) {
 	switch key {
 	case MLI2I:
 		// Create MLI in Network Byte Order
-		b := make([]byte, Size2I)
-		binary.BigEndian.PutUint16(b, uint16(length+Size2I)) // include mli size
-		return b, nil
+		var b [Size2I]byte
+                binary.BigEndian.PutUint16(b[:], uint16(length+Size2I)) // include mli size
+                return b[:], nil
 
 	case MLI2E:
 		// Create MLI in Network Byte Order
-		b := make([]byte, Size2E)
-		binary.BigEndian.PutUint16(b, uint16(length))
-		return b, nil
+		var b [Size2E]byte
+                binary.BigEndian.PutUint16(b[:], uint16(length))
+                return b[:], nil
 
 	case MLI4I:
 		// Create MLI in Network Byte Order
-		b := make([]byte, Size4I)
-		binary.BigEndian.PutUint32(b, uint32(length+Size4I)) // include mli size
-		return b, nil
+		var b [Size4I]byte
+                binary.BigEndian.PutUint32(b[:], uint32(length+Size4I)) // include mli size
+                return b[:], nil
 
 	case MLI4E:
 		// Create MLI in Network Byte Order
-		b := make([]byte, Size4E)
-		binary.BigEndian.PutUint32(b, uint32(length))
-		return b, nil
+		var b [Size4E]byte
+                binary.BigEndian.PutUint32(b[:], uint32(length))
+                return b[:], nil
 
 	case MLI2EE:
 		// Create MLI in Network Byte Order
-		b := make([]byte, Size2EE)
-		binary.BigEndian.PutUint16(b, uint16(length-Size2EE)) // remove embedded 2-byte header length
-		return b, nil
+		var b [Size2EE]byte
+                binary.BigEndian.PutUint16(b[:], uint16(length-Size2EE)) // remove embedded 2-byte header length
+                return b[:], nil
 
 	case MLI2BCD2:
 		// Create MLI in Binary-Coded Decimal
